@@ -1,0 +1,4 @@
+.gradle/
+.idea/
+*.iml
+demos/**/backup/*.tar.gz

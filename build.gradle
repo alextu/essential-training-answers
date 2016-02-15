@@ -1,0 +1,49 @@
+if (!project.hasProperty('artUrl')) {
+    project.ext.artUrl = 'http://localhost:8081/artifactory'
+}
+
+task runCleanArtifactory << {
+    "docker stop arti".execute()
+    "docker rm arti".execute()
+    def userHome = System.properties['user.home']
+    def cmdLine = "docker run --name arti -d --volume=$userHome/license/artifactory-H1.lic:/etc/opt/jfrog/artifactory/artifactory.lic:ro -p 8081:8081 jfrog-docker-reg2.bintray.io/jfrog/artifactory-pro:latest"
+    def process = cmdLine.execute()
+    process.waitFor()
+    if (process.exitValue()) {
+        println "Couldn't launch artifactory : $process.err.text"
+    } else {
+        println "Artifactory launched"
+    }
+}
+
+task runRestSnippets << {
+	def part = project.hasProperty('part') ? project.ext.part : null
+    def snippets = []
+    String filePattern = "**/*.sh"
+    if (part) {
+        filePattern = "**/${part}.sh"
+    }
+    ConfigurableFileTree exo = project.fileTree('.')
+    exo.include(filePattern)
+    snippets = exo.files
+    snippets.sort()
+    println "Will execute : $snippets"
+    snippets.each {
+        runSnippet(it)
+    }
+}
+
+private void runSnippet(File snippet) {
+    ProcessBuilder processBuilder = new ProcessBuilder("$snippet.path")
+            .redirectErrorStream(true)
+            .directory(snippet.parentFile)
+    def envs = processBuilder.environment()
+    envs['artUrl'] = project.ext.artUrl
+    def process = processBuilder.start()
+    process.waitFor()
+    if (process.exitValue()) {
+        println "OUTPUT : ${process.exitValue()}"
+        println process.text
+        throw new GradleException("Script exec failed : $snippet.path")
+    }
+}
